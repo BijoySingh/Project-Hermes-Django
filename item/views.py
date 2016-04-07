@@ -222,7 +222,6 @@ class ItemViewSet(viewsets.ModelViewSet):
 
 
 class ReactableViewSet(viewsets.ModelViewSet):
-
     @staticmethod
     def handle_upvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
