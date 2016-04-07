@@ -13,9 +13,38 @@ Including another URLconf
     1. Import the include() function: from django.conf.urls import url, include
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
-from django.conf.urls import url
+import re
+
+import rest_framework_swagger
+import rest_framework_swagger.urls
+from django.conf import settings
+from django.conf.urls import url, include
 from django.contrib import admin
+from django.views.static import serve
+from rest_framework.routers import DefaultRouter
+
+from item.views import ItemViewSet, CommentViewSet, PhotoViewSet
+
+router = DefaultRouter()
+router.register('item', ItemViewSet, base_name='item')
+router.register('comment', CommentViewSet, base_name='post')
+router.register('photo', PhotoViewSet, base_name='picture')
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
+    url(r'^api/', include(router.urls)),
+    url(r'^api-docs/', include(rest_framework_swagger.urls, namespace='api-docs')),
+]
+
+urlpatterns += [
+    url(r'^%s(?P<path>.*)$' % re.escape(settings.STATIC_URL.lstrip('/')), serve,
+        kwargs={
+            'document_root': settings.STATIC_ROOT,
+        }
+        ),
+    url(r'^%s(?P<path>.*)$' % re.escape(settings.MEDIA_URL.lstrip('/')), serve,
+        kwargs={
+            'document_root': settings.MEDIA_ROOT,
+        }
+        ),
 ]

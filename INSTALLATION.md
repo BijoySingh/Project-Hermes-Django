@@ -13,8 +13,7 @@ nodejs-legacy npm
 [postgresql wiki](https://wiki.postgresql.org/wiki/First_steps).
 
 ```lang=bash
-sudo su - postgres
-psql # Now you must be in postgresql command line mode
+ppsql # Now you must be in postgresql command line mode
 
 CREATE DATABASE project_hermes;
 CREATE USER project_hermes WITH PASSWORD 'project_hermes';

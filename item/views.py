@@ -7,9 +7,15 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 
-from item.models import Item, Comment, Reaction, ReactionChoices, Photo
+from account.models import UserProfile
+from item.models import Item, Comment, Reaction, ReactionChoices, Photo, Rating
 from item.serializers import CreateItemSerializer, ItemSerializer, BoundingBoxSerializer, CommentSerializer, \
-    PhotoSerializer, UpdateItemSerializer
+    PhotoSerializer, UpdateItemSerializer, RatingSerializer, AddRatingSerializer, AddCommentSerializer, \
+    AddPhotoSerializer
+
+
+def get_author(user):
+    return UserProfile.objects.filter(user=user).first()
 
 
 class ItemViewSet(viewsets.ModelViewSet):
@@ -18,6 +24,12 @@ class ItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def create(self, request, *args, **kwargs):
+        """
+        create the item
+        ---
+        request_serializer: CreateItemSerializer
+        """
+
         serialized_data = CreateItemSerializer(data=request.data)
         if serialized_data.is_valid():
             item = Item.objects.filter(user=request.user, location=serialized_data.validated_data['location']).first()
@@ -27,7 +39,7 @@ class ItemViewSet(viewsets.ModelViewSet):
                         longitude=serialized_data.validated_data['longitude'],
                         title=serialized_data.validated_data['title'],
                         description=serialized_data.validated_data['description'],
-                        author=request.user,
+                        author=get_author(request.user),
                 )
             return Response(self.serializer_class(item).data)
         else:
@@ -35,6 +47,12 @@ class ItemViewSet(viewsets.ModelViewSet):
 
     @list_route(methods=['POST'], permission_classes=[])
     def search_bounding_box(self, request):
+        """
+        Get items by Bounding Box
+        ---
+        request_serializer: BoundingBoxSerializer
+        """
+
         serialized_data = BoundingBoxSerializer(data=request.data)
 
         if serialized_data.is_valid():
@@ -66,7 +84,7 @@ class ItemViewSet(viewsets.ModelViewSet):
             return Response({'success': False})
 
     @detail_route()
-    def get_posts(self, request, pk):
+    def get_comments(self, request, pk):
         item = get_object_or_404(Item, pk=pk)
         comments = item.comments.all()
         response = {
@@ -84,6 +102,12 @@ class ItemViewSet(viewsets.ModelViewSet):
         return Response(response)
 
     def update(self, request, *args, **kwargs):
+        """
+        update the item
+        ---
+        request_serializer: UpdateItemSerializer
+        """
+
         serialized_data = UpdateItemSerializer(data=request.data)
         item = self.get_object()
         if item.author.user != request.user:
@@ -98,29 +122,116 @@ class ItemViewSet(viewsets.ModelViewSet):
         else:
             return Response({'success': False, 'message': 'Incorrect Data Sent'}, status=HTTP_400_BAD_REQUEST)
 
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
+    def add_rating(self, request, pk):
+        """
+        Set rating of the item
+        ---
+        request_serializer: AddRatingSerializer
+        """
+
+        item = self.get_object()
+        serialized_data = AddRatingSerializer(data=request.data)
+        if serialized_data.is_valid():
+            rating = Rating.objects.filter(item=item, author__user=request.user).first()
+            if rating:
+                rating.rating = serialized_data.validated_data['rating']
+                rating.save()
+            else:
+                rating = Rating.objects.create(
+                        rating=serialized_data.validated_data['rating'],
+                        item=item,
+                        author=get_author(request.user),
+                )
+            response = {
+                'success': True,
+                'result': RatingSerializer(rating).data
+            }
+            return Response(response)
+        else:
+            return Response({'success': False, 'message': 'Incorrect Data Sent'}, status=HTTP_400_BAD_REQUEST)
+
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
+    def add_comment(self, request, pk):
+        """
+        add comment of the item
+        ---
+        request_serializer: AddCommentSerializer
+        """
+
+        item = self.get_object()
+        serialized_data = AddCommentSerializer(data=request.data)
+        if serialized_data.is_valid():
+            comment = Comment.objects.filter(item=item, author__user=request.user).first()
+            if comment:
+                comment.description = serialized_data.validated_data['description']
+                comment.save()
+            else:
+                comment = Comment.objects.create(
+                        description=serialized_data.validated_data['description'],
+                        item=item,
+                        author=get_author(request.user),
+                )
+            response = {
+                'success': True,
+                'result': CommentSerializer(comment).data
+            }
+            return Response(response)
+        else:
+            return Response({'success': False, 'message': 'Incorrect Data Sent'}, status=HTTP_400_BAD_REQUEST)
+
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
+    def add_photo(self, request, pk):
+        """
+        add comment of the item
+        ---
+        request_serializer: AddPhotoSerializer
+        """
+
+        item = self.get_object()
+        serialized_data = AddPhotoSerializer(data=request.data)
+        if serialized_data.is_valid():
+            photo = Photo.objects.filter(item=item, author__user=request.user).first()
+            if photo:
+                photo.description = serialized_data.validated_data['picture']
+                photo.save()
+            else:
+                photo = Photo.objects.create(
+                        picture=serialized_data.validated_data['picture'],
+                        item=item,
+                        author=get_author(request.user),
+                )
+            response = {
+                'success': True,
+                'result': PhotoSerializer(photo).data
+            }
+            return Response(response)
+        else:
+            return Response({'success': False, 'message': 'Incorrect Data Sent'}, status=HTTP_400_BAD_REQUEST)
+
 
 class ReactableViewSet(viewsets.ModelViewSet):
     @staticmethod
-    def upvote(request, pk, reactable):
+    def handle_upvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
-            reaction.reaction = ReactionChoices.UPVOTE
-            reaction.save()
-
             if reaction.reaction == ReactionChoices.DOWNVOTE:
                 reactable.upvotes += 1
-                reactable.upvotes -= 1
+                reactable.downvotes -= 1
                 reactable.save()
 
             if reaction.reaction == ReactionChoices.NONE:
                 reactable.upvotes += 1
                 reactable.save()
 
+            reaction.reaction = ReactionChoices.UPVOTE
+            reaction.save()
+
         else:
             Reaction.objects.create(
-                reaction=ReactionChoices.UPVOTE,
-                reactable=reactable,
-                author=request.user
+                    reaction=ReactionChoices.UPVOTE,
+                    reactable=reactable,
+                    author=get_author(request.user),
             )
             reactable.upvotes += 1
             reactable.save()
@@ -128,41 +239,40 @@ class ReactableViewSet(viewsets.ModelViewSet):
         return reactable
 
     @staticmethod
-    def downvote(request, pk, reactable):
+    def handle_downvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
-            reaction.reaction = ReactionChoices.DOWNVOTE
-            reaction.save()
-
             if reaction.reaction == ReactionChoices.UPVOTE:
                 reactable.upvotes -= 1
-                reactable.upvotes += 1
+                reactable.downvotes += 1
                 reactable.save()
 
             if reaction.reaction == ReactionChoices.NONE:
                 reactable.downvotes += 1
                 reactable.save()
 
+            reaction.reaction = ReactionChoices.DOWNVOTE
+            reaction.save()
+
         else:
             Reaction.objects.create(
-                reaction=ReactionChoices.DOWNVOTE,
-                reactable=reactable,
-                author=request.user
+                    reaction=ReactionChoices.DOWNVOTE,
+                    reactable=reactable,
+                    author=get_author(request.user),
             )
             reactable.downvotes += 1
             reactable.save()
 
         return reactable
 
-
     @staticmethod
-    def flag(request, pk, reactable):
+    def handle_flag(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user, reaction=ReactionChoices.FLAG).first()
         if not reaction:
             Reaction.objects.create(
-                reaction=ReactionChoices.FLAG,
-                reactable=reactable,
-                author=request.user
+                    reaction=ReactionChoices.FLAG,
+                    reactable=reactable,
+                    author=get_author(request.user),
             )
             reactable.flags += 1
             reactable.save()
@@ -170,7 +280,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
         return reactable
 
     @staticmethod
-    def unflag(request, pk, reactable):
+    def handle_unflag(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user, reaction=ReactionChoices.FLAG).first()
         if reaction:
             reaction.delete()
@@ -180,7 +290,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
         return reactable
 
     @staticmethod
-    def unvote(request, pk, reactable):
+    def handle_unvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
             if reaction.reaction == ReactionChoices.UPVOTE:
@@ -193,41 +303,71 @@ class ReactableViewSet(viewsets.ModelViewSet):
 
         return reactable
 
-    @detail_route(methods=['POST'])
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
     def upvote(self, request, pk):
-        reactable = self.upvote(request, pk, self.get_object())
+        """
+        ---
+        parameters_strategy:
+            form: replace
+        """
+
+        reactable = self.handle_upvote(request, pk, self.get_object())
         response = {
             'result': self.serializer_class(reactable).data
         }
         return Response(response)
 
-    @detail_route(methods=['POST'])
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
     def downvote(self, request, pk):
-        reactable = self.downvote(request, pk, self.get_object())
+        """
+        ---
+        parameters_strategy:
+            form: replace
+        """
+
+        reactable = self.handle_downvote(request, pk, self.get_object())
         response = {
             'result': self.serializer_class(reactable).data
         }
         return Response(response)
 
-    @detail_route(methods=['POST'])
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
     def flag(self, request, pk):
-        reactable = self.flag(request, pk, self.get_object())
+        """
+        ---
+        parameters_strategy:
+            form: replace
+        """
+
+        reactable = self.handle_flag(request, pk, self.get_object())
         response = {
             'result': self.serializer_class(reactable).data
         }
         return Response(response)
 
-    @detail_route(methods=['POST'])
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
     def unvote(self, request, pk):
-        reactable = self.unvote(request, pk, self.get_object())
+        """
+        ---
+        parameters_strategy:
+            form: replace
+        """
+
+        reactable = self.handle_unvote(request, pk, self.get_object())
         response = {
             'result': self.serializer_class(reactable).data
         }
         return Response(response)
 
-    @detail_route(methods=['POST'])
+    @detail_route(methods=['POST'], permission_classes=[IsAuthenticated])
     def unflag(self, request, pk):
-        reactable = self.unflag(request, pk, self.get_object())
+        """
+        ---
+        parameters_strategy:
+            form: replace
+        """
+
+        reactable = self.handle_unflag(request, pk, self.get_object())
         response = {
             'result': self.serializer_class(reactable).data
         }
@@ -239,8 +379,8 @@ class CommentViewSet(ReactableViewSet):
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
+
 class PhotoViewSet(ReactableViewSet):
     queryset = Photo.objects.all()
     serializer_class = PhotoSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
-

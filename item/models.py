@@ -32,8 +32,8 @@ class ReactionChoices:
     @classmethod
     def get(cls):
         return [(cls.NONE, 'None'),
-                (cls.UPVOTE, 'Like'),
-                (cls.DOWNVOTE, 'Dislike'),
+                (cls.UPVOTE, 'Upvote'),
+                (cls.DOWNVOTE, 'Downvote'),
                 (cls.FLAG, 'Flag')]
 
 
@@ -63,7 +63,6 @@ class Rating(models.Model):
 
 
 class Reactable(models.Model):
-    author = models.ForeignKey(UserProfile)
     upvotes = models.IntegerField(default=0)
     downvotes = models.IntegerField(default=0)
     flags = models.IntegerField(default=0)
@@ -79,6 +78,7 @@ class Reaction(models.Model):
 
 class Comment(Reactable):
     item = models.ForeignKey(Item, related_name='comments')
+    author = models.ForeignKey(UserProfile)
     description = models.TextField()
 
     class Meta:
@@ -87,4 +87,5 @@ class Comment(Reactable):
 
 class Photo(Reactable):
     item = models.ForeignKey(Item, related_name='photos')
+    author = models.ForeignKey(UserProfile)
     picture = models.ImageField()
