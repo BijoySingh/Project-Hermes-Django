@@ -230,12 +230,12 @@ class ReactableViewSet(viewsets.ModelViewSet):
             if reaction.reaction == ReactionChoices.DOWNVOTE:
                 reactable.upvotes += 1
                 reactable.downvotes -= 1
-                reactable.score = reactable.calculate_score()
+                reactable.recalculate_score()
                 reactable.save()
 
             if reaction.reaction == ReactionChoices.NONE:
                 reactable.upvotes += 1
-                reactable.score = reactable.calculate_score()
+                reactable.recalculate_score()
                 reactable.save()
 
             reaction.reaction = ReactionChoices.UPVOTE
@@ -248,7 +248,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     author=get_author(request.user),
             )
             reactable.upvotes += 1
-            reactable.score = reactable.calculate_score()
+            reactable.recalculate_score()
             reactable.save()
 
         return reactable
@@ -260,12 +260,12 @@ class ReactableViewSet(viewsets.ModelViewSet):
             if reaction.reaction == ReactionChoices.UPVOTE:
                 reactable.upvotes -= 1
                 reactable.downvotes += 1
-                reactable.score = reactable.calculate_score()
+                reactable.recalculate_score()
                 reactable.save()
 
             if reaction.reaction == ReactionChoices.NONE:
                 reactable.downvotes += 1
-                reactable.score = reactable.calculate_score()
+                reactable.recalculate_score()
                 reactable.save()
 
             reaction.reaction = ReactionChoices.DOWNVOTE
@@ -278,7 +278,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     author=get_author(request.user),
             )
             reactable.downvotes += 1
-            reactable.score = reactable.calculate_score()
+            reactable.recalculate_score()
             reactable.save()
 
         return reactable
@@ -293,7 +293,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     author=get_author(request.user),
             )
             reactable.flags += 1
-            reactable.score = reactable.calculate_score()
+            reactable.recalculate_score()
             reactable.save()
 
         return reactable
@@ -304,7 +304,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
         if reaction:
             reaction.delete()
             reactable.flags -= 1
-            reactable.score = reactable.calculate_score()
+            reactable.recalculate_score()
             reactable.save()
 
         return reactable
@@ -315,11 +315,11 @@ class ReactableViewSet(viewsets.ModelViewSet):
         if reaction:
             if reaction.reaction == ReactionChoices.UPVOTE:
                 reactable.upvotes -= 1
-                reactable.score = reactable.calculate_score()
+                reactable.recalculate_score()
                 reactable.save()
             elif reaction.reaction == ReactionChoices.DOWNVOTE:
                 reactable.downvotes -= 1
-                reactable.score = reactable.calculate_score()
+                reactable.recalculate_score()
                 reactable.save()
             reaction.delete()
 

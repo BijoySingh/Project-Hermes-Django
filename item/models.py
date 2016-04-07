@@ -79,7 +79,7 @@ class Reactable(models.Model):
 
         return 0.0
 
-    def calculate_score(self):
+    def recalculate_score(self):
         return self.BASE_SCORE - self.convert_to_score(self.flags, 50, values=(0, 4, 8, 16, 32)) \
                - self.convert_to_score(self.downvotes, 20, values=(0, 5, 10, 20, 50)) \
                + self.convert_to_score(self.upvotes, 10)
@@ -100,8 +100,18 @@ class Comment(Reactable):
     class Meta:
         unique_together = [['item', 'author']]
 
+    def recalculate_score(self):
+        score = super(self).recalculate_score()
+        self.author.reputation += (score - self.experience)
+        self.experience = score
+
 
 class Photo(Reactable):
     item = models.ForeignKey(Item, related_name='photos')
     author = models.ForeignKey(UserProfile)
     picture = models.ImageField()
+
+    def recalculate_score(self):
+        score = super(self).recalculate_score()
+        self.author.reputation += (score - self.experience)
+        self.experience = score
