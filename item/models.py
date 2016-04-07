@@ -25,15 +25,15 @@ class ItemStatusChoices:
 
 class ReactionChoices:
     NONE = 0
-    LIKE = 1
-    DISLIKE = 2
+    UPVOTE = 1
+    DOWNVOTE = 2
     FLAG = 3
 
     @classmethod
     def get(cls):
         return [(cls.NONE, 'None'),
-                (cls.LIKE, 'Like'),
-                (cls.DISLIKE, 'Dislike'),
+                (cls.UPVOTE, 'Like'),
+                (cls.DOWNVOTE, 'Dislike'),
                 (cls.FLAG, 'Flag')]
 
 
@@ -56,6 +56,7 @@ class Item(models.Model):
 class Rating(models.Model):
     item = models.ForeignKey(Item, related_name='ratings')
     author = models.ForeignKey(UserProfile)
+    rating = models.FloatField(default=0.0)
 
     class Meta:
         unique_together = [['item', 'author']]
@@ -63,8 +64,8 @@ class Rating(models.Model):
 
 class Reactable(models.Model):
     author = models.ForeignKey(UserProfile)
-    likes = models.IntegerField(default=0)
-    dislikes = models.IntegerField(default=0)
+    upvotes = models.IntegerField(default=0)
+    downvotes = models.IntegerField(default=0)
     flags = models.IntegerField(default=0)
     timestamp = models.DateTimeField(auto_now_add=True)
 
@@ -81,7 +82,7 @@ class Comment(Reactable):
     description = models.TextField()
 
     class Meta:
-        unique_together = [['item', ]]
+        unique_together = [['item', 'author']]
 
 
 class Photo(Reactable):
