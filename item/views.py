@@ -8,10 +8,11 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 
 from account.models import UserProfile
-from item.models import Item, Comment, Reaction, ReactionChoices, Photo, Rating
+from item.models import Item, Comment, Reaction, ReactionChoices, Photo, Rating, ItemStatusChoices
 from item.serializers import CreateItemSerializer, ItemSerializer, BoundingBoxSerializer, CommentSerializer, \
-    PhotoSerializer, UpdateItemSerializer, RatingSerializer, AddRatingSerializer, AddCommentSerializer, \
+    PhotoSerializer, UpdateItemSerializer, AddRatingSerializer, AddCommentSerializer, \
     AddPhotoSerializer
+from project_hermes.hermes_config import Configurations
 
 
 def get_author(user):
@@ -33,13 +34,16 @@ class ItemViewSet(viewsets.ModelViewSet):
         serialized_data = CreateItemSerializer(data=request.data)
         if serialized_data.is_valid():
             item = Item.objects.filter(user=request.user, location=serialized_data.validated_data['location']).first()
+            author = get_author(request.user)
+            status = ItemStatusChoices.UNVERIFIED if author < Configurations.AUTO_VERIFICATION_REPUTATION else ItemStatusChoices.VERIFIED
             if not item:
                 item = Item.objects.create(
                         latitude=serialized_data.validated_data['latitude'],
                         longitude=serialized_data.validated_data['longitude'],
                         title=serialized_data.validated_data['title'],
                         description=serialized_data.validated_data['description'],
-                        author=get_author(request.user),
+                        author=author,
+                        status=status,
                 )
             return Response(self.serializer_class(item).data)
         else:
@@ -135,6 +139,10 @@ class ItemViewSet(viewsets.ModelViewSet):
         if serialized_data.is_valid():
             rating = Rating.objects.filter(item=item, author__user=request.user).first()
             if rating:
+                item.rating -= rating.rating
+                item.rating += serialized_data.validated_data['rating']
+                item.save()
+
                 rating.rating = serialized_data.validated_data['rating']
                 rating.save()
             else:
@@ -143,9 +151,12 @@ class ItemViewSet(viewsets.ModelViewSet):
                         item=item,
                         author=get_author(request.user),
                 )
+                item.rating += rating.rating
+                item.save()
+
             response = {
                 'success': True,
-                'result': RatingSerializer(rating).data
+                'result': self.serializer_class(item).data
             }
             return Response(response)
         else:
@@ -211,6 +222,7 @@ class ItemViewSet(viewsets.ModelViewSet):
 
 
 class ReactableViewSet(viewsets.ModelViewSet):
+
     @staticmethod
     def handle_upvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
@@ -218,10 +230,12 @@ class ReactableViewSet(viewsets.ModelViewSet):
             if reaction.reaction == ReactionChoices.DOWNVOTE:
                 reactable.upvotes += 1
                 reactable.downvotes -= 1
+                reactable.score = reactable.calculate_score()
                 reactable.save()
 
             if reaction.reaction == ReactionChoices.NONE:
                 reactable.upvotes += 1
+                reactable.score = reactable.calculate_score()
                 reactable.save()
 
             reaction.reaction = ReactionChoices.UPVOTE
@@ -234,6 +248,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     author=get_author(request.user),
             )
             reactable.upvotes += 1
+            reactable.score = reactable.calculate_score()
             reactable.save()
 
         return reactable
@@ -245,10 +260,12 @@ class ReactableViewSet(viewsets.ModelViewSet):
             if reaction.reaction == ReactionChoices.UPVOTE:
                 reactable.upvotes -= 1
                 reactable.downvotes += 1
+                reactable.score = reactable.calculate_score()
                 reactable.save()
 
             if reaction.reaction == ReactionChoices.NONE:
                 reactable.downvotes += 1
+                reactable.score = reactable.calculate_score()
                 reactable.save()
 
             reaction.reaction = ReactionChoices.DOWNVOTE
@@ -261,6 +278,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     author=get_author(request.user),
             )
             reactable.downvotes += 1
+            reactable.score = reactable.calculate_score()
             reactable.save()
 
         return reactable
@@ -275,6 +293,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     author=get_author(request.user),
             )
             reactable.flags += 1
+            reactable.score = reactable.calculate_score()
             reactable.save()
 
         return reactable
@@ -285,6 +304,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
         if reaction:
             reaction.delete()
             reactable.flags -= 1
+            reactable.score = reactable.calculate_score()
             reactable.save()
 
         return reactable
@@ -295,9 +315,11 @@ class ReactableViewSet(viewsets.ModelViewSet):
         if reaction:
             if reaction.reaction == ReactionChoices.UPVOTE:
                 reactable.upvotes -= 1
+                reactable.score = reactable.calculate_score()
                 reactable.save()
             elif reaction.reaction == ReactionChoices.DOWNVOTE:
                 reactable.downvotes -= 1
+                reactable.score = reactable.calculate_score()
                 reactable.save()
             reaction.delete()
 

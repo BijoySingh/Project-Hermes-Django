@@ -63,15 +63,31 @@ class Rating(models.Model):
 
 
 class Reactable(models.Model):
+    BASE_SCORE = 10.0
+
     upvotes = models.IntegerField(default=0)
     downvotes = models.IntegerField(default=0)
     flags = models.IntegerField(default=0)
     timestamp = models.DateTimeField(auto_now_add=True)
+    experience = models.FloatField(default=0)
+
+    @staticmethod
+    def convert_to_score(count, scale, values=(1, 10, 50, 200, 1000), scores=(1, 2, 4, 8, 16)):
+        for index in reversed(range(len(values))):
+            if values[index] < count:
+                return scores[index]
+
+        return 0.0
+
+    def calculate_score(self):
+        return self.BASE_SCORE - self.convert_to_score(self.flags, 50, values=(0, 4, 8, 16, 32)) \
+               - self.convert_to_score(self.downvotes, 20, values=(0, 5, 10, 20, 50)) \
+               + self.convert_to_score(self.upvotes, 10)
 
 
 class Reaction(models.Model):
     reaction = models.IntegerField(choices=ReactionChoices.get(), default=ReactionChoices.NONE)
-    reactable = models.ForeignKey(Reactable)
+    reactable = models.ForeignKey(Reactable, related_name='reactions')
     author = models.ForeignKey(UserProfile)
     timestamp = models.DateTimeField(auto_now_add=True)
 
