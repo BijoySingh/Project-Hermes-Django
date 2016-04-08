@@ -117,7 +117,7 @@ class Comment(Reactable):
         unique_together = [['item', 'author']]
 
     def recalculate_score(self):
-        score = super(self).recalculate_score()
+        score = super().recalculate_score()
         self.author.reputation += (score - self.experience)
         self.experience = score
 
@@ -128,6 +128,6 @@ class Photo(Reactable):
     picture = models.ImageField()
 
     def recalculate_score(self):
-        score = super(self).recalculate_score()
+        score = super().recalculate_score()
         self.author.reputation += (score - self.experience)
         self.experience = score
