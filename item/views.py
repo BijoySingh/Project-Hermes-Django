@@ -18,6 +18,25 @@ from project_hermes.hermes_config import Configurations
 def get_author(user):
     return UserProfile.objects.filter(user=user).first()
 
+def recalculate_reputation(profile: UserProfile):
+    comments = Comment.objects.filter(author=profile)
+    photos = Photo.objects.filter(author=profile)
+    reactions = Reaction.objects.filter(author=profile).count()
+
+    reputation = 0
+    for comment in comments:
+        reputation += comment.experience
+    for photo in photos:
+        reputation += photo.experience
+    reputation += reactions
+
+    items = Item.objects.filter(author=profile)
+    for item in items:
+        reputation += item.rating * 2
+        reputation -= item.flags * 10
+
+    profile.reputation = reputation
+    profile.save()
 
 class ItemViewSet(viewsets.ModelViewSet):
     queryset = Item.objects.all()
@@ -55,6 +74,7 @@ class ItemViewSet(viewsets.ModelViewSet):
                         author=author,
                         status=status,
                 )
+            recalculate_reputation(author)
             return Response(self.serializer_class(item).data)
         else:
             return Response({'success': False, 'message': 'Incorrect Data Sent'}, status=HTTP_400_BAD_REQUEST)
@@ -131,7 +151,7 @@ class ItemViewSet(viewsets.ModelViewSet):
             item.title = serialized_data.validated_data['title']
             item.description = serialized_data.validated_data['description']
             item.save()
-
+            recalculate_reputation(item.author)
             return Response(self.serializer_class(item).data)
         else:
             return Response({'success': False, 'message': 'Incorrect Data Sent'}, status=HTTP_400_BAD_REQUEST)
@@ -167,7 +187,7 @@ class ItemViewSet(viewsets.ModelViewSet):
 
                 item.recalculate_rating()
                 item.save()
-
+            recalculate_reputation(rating.author)
             response = {
                 'success': True,
                 'result': self.serializer_class(item).data
@@ -201,6 +221,7 @@ class ItemViewSet(viewsets.ModelViewSet):
                 'success': True,
                 'result': CommentSerializer(comment).data
             }
+            recalculate_reputation(comment.author)
             return Response(response)
         else:
             return Response({'success': False, 'message': 'Incorrect Data Sent'}, status=HTTP_400_BAD_REQUEST)
@@ -226,6 +247,7 @@ class ItemViewSet(viewsets.ModelViewSet):
                         item=item,
                         author=get_author(request.user),
                 )
+            recalculate_reputation(photo.author)
             response = {
                 'success': True,
                 'result': PhotoSerializer(photo).data
@@ -238,7 +260,7 @@ class ItemViewSet(viewsets.ModelViewSet):
 class ReactableViewSet(viewsets.ModelViewSet):
     @staticmethod
     def handle_upvote(request, pk, reactable):
-        reaction = Reaction.objects.filter(author__user=request.user, reactable=reactable)\
+        reaction = Reaction.objects.filter(author__user=request.user, reactable=reactable) \
             .exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
             reaction.reaction = ReactionChoices.UPVOTE
@@ -258,7 +280,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
 
     @staticmethod
     def handle_downvote(request, pk, reactable):
-        reaction = Reaction.objects.filter(author__user=request.user, reactable=reactable)\
+        reaction = Reaction.objects.filter(author__user=request.user, reactable=reactable) \
             .exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
             reaction.reaction = ReactionChoices.DOWNVOTE
@@ -309,7 +331,7 @@ class ReactableViewSet(viewsets.ModelViewSet):
 
     @staticmethod
     def handle_unvote(request, pk, reactable):
-        reaction = Reaction.objects.filter(author__user=request.user, reactable=reactable)\
+        reaction = Reaction.objects.filter(author__user=request.user, reactable=reactable) \
             .exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
             reaction.delete()
@@ -329,6 +351,8 @@ class ReactableViewSet(viewsets.ModelViewSet):
         """
 
         reactable = self.handle_upvote(request, pk, self.get_object())
+        recalculate_reputation(reactable.author)
+        recalculate_reputation(request.user)
         response = {
             'result': self.serializer_class(reactable).data
         }
@@ -343,6 +367,8 @@ class ReactableViewSet(viewsets.ModelViewSet):
         """
 
         reactable = self.handle_downvote(request, pk, self.get_object())
+        recalculate_reputation(reactable.author)
+        recalculate_reputation(request.user)
         response = {
             'result': self.serializer_class(reactable).data
         }
@@ -357,6 +383,8 @@ class ReactableViewSet(viewsets.ModelViewSet):
         """
 
         reactable = self.handle_flag(request, pk, self.get_object())
+        recalculate_reputation(reactable.author)
+        recalculate_reputation(request.user)
         response = {
             'result': self.serializer_class(reactable).data
         }
@@ -371,6 +399,8 @@ class ReactableViewSet(viewsets.ModelViewSet):
         """
 
         reactable = self.handle_unvote(request, pk, self.get_object())
+        recalculate_reputation(reactable.author)
+        recalculate_reputation(request.user)
         response = {
             'result': self.serializer_class(reactable).data
         }
@@ -385,6 +415,8 @@ class ReactableViewSet(viewsets.ModelViewSet):
         """
 
         reactable = self.handle_unflag(request, pk, self.get_object())
+        recalculate_reputation(reactable.author)
+        recalculate_reputation(request.user)
         response = {
             'result': self.serializer_class(reactable).data
         }

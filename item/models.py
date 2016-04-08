@@ -56,7 +56,6 @@ class Item(models.Model):
         self.rating = 0.0
         weight = 0.0
 
-
         for rating in self.ratings.all():
             rating_weight = 1.0
             # Could be a function of the user : max(0.0, rating.author.reputation)
