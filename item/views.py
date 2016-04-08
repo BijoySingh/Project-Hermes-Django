@@ -240,29 +240,18 @@ class ReactableViewSet(viewsets.ModelViewSet):
     def handle_upvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
-            if reaction.reaction == ReactionChoices.DOWNVOTE:
-                reactable.upvotes += 1
-                reactable.downvotes -= 1
-                reactable.recalculate_score()
-                reactable.save()
-
-            if reaction.reaction == ReactionChoices.NONE:
-                reactable.upvotes += 1
-                reactable.recalculate_score()
-                reactable.save()
-
             reaction.reaction = ReactionChoices.UPVOTE
             reaction.save()
-
         else:
             Reaction.objects.create(
                     reaction=ReactionChoices.UPVOTE,
                     reactable=reactable,
                     author=get_author(request.user),
             )
-            reactable.upvotes += 1
-            reactable.recalculate_score()
-            reactable.save()
+
+        reactable.recalculate_votes()
+        reactable.recalculate_score()
+        reactable.save()
 
         return reactable
 
@@ -270,17 +259,6 @@ class ReactableViewSet(viewsets.ModelViewSet):
     def handle_downvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
-            if reaction.reaction == ReactionChoices.UPVOTE:
-                reactable.upvotes -= 1
-                reactable.downvotes += 1
-                reactable.recalculate_score()
-                reactable.save()
-
-            if reaction.reaction == ReactionChoices.NONE:
-                reactable.downvotes += 1
-                reactable.recalculate_score()
-                reactable.save()
-
             reaction.reaction = ReactionChoices.DOWNVOTE
             reaction.save()
 
@@ -290,9 +268,10 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     reactable=reactable,
                     author=get_author(request.user),
             )
-            reactable.downvotes += 1
-            reactable.recalculate_score()
-            reactable.save()
+
+        reactable.recalculate_votes()
+        reactable.recalculate_score()
+        reactable.save()
 
         return reactable
 
@@ -305,9 +284,10 @@ class ReactableViewSet(viewsets.ModelViewSet):
                     reactable=reactable,
                     author=get_author(request.user),
             )
-            reactable.flags += 1
-            reactable.recalculate_score()
-            reactable.save()
+
+        reactable.recalculate_votes()
+        reactable.recalculate_score()
+        reactable.save()
 
         return reactable
 
@@ -316,9 +296,10 @@ class ReactableViewSet(viewsets.ModelViewSet):
         reaction = Reaction.objects.filter(author__user=request.user, reaction=ReactionChoices.FLAG).first()
         if reaction:
             reaction.delete()
-            reactable.flags -= 1
-            reactable.recalculate_score()
-            reactable.save()
+
+        reactable.recalculate_votes()
+        reactable.recalculate_score()
+        reactable.save()
 
         return reactable
 
@@ -326,15 +307,11 @@ class ReactableViewSet(viewsets.ModelViewSet):
     def handle_unvote(request, pk, reactable):
         reaction = Reaction.objects.filter(author__user=request.user).exclude(reaction=ReactionChoices.FLAG).first()
         if reaction:
-            if reaction.reaction == ReactionChoices.UPVOTE:
-                reactable.upvotes -= 1
-                reactable.recalculate_score()
-                reactable.save()
-            elif reaction.reaction == ReactionChoices.DOWNVOTE:
-                reactable.downvotes -= 1
-                reactable.recalculate_score()
-                reactable.save()
             reaction.delete()
+
+        reactable.recalculate_votes()
+        reactable.recalculate_score()
+        reactable.save()
 
         return reactable
 

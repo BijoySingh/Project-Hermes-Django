@@ -100,6 +100,11 @@ class Reactable(models.Model):
                - self.convert_to_score(self.downvotes, 20, values=(0, 5, 10, 20, 50)) \
                + self.convert_to_score(self.upvotes, 10)
 
+    def recalculate_votes(self):
+        self.upvotes = Reaction.objects.filter(reactable=self, reaction=ReactionChoices.UPVOTE).count()
+        self.downvotes = Reaction.objects.filter(reactable=self, reaction=ReactionChoices.DOWNVOTE).count()
+        self.flags = Reaction.objects.filter(reactable=self, reaction=ReactionChoices.FLAG).count()
+
 
 class Reaction(models.Model):
     reaction = models.IntegerField(choices=ReactionChoices.get(), default=ReactionChoices.NONE)
