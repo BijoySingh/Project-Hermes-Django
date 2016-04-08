@@ -23,7 +23,7 @@ from django.contrib import admin
 from django.views.static import serve
 from rest_framework.routers import DefaultRouter
 
-from item.views import ItemViewSet, CommentViewSet, PhotoViewSet
+,from item.views import ItemViewSet, CommentViewSet, PhotoViewSet
 
 router = DefaultRouter()
 router.register('item', ItemViewSet, base_name='item')
