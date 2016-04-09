@@ -237,16 +237,11 @@ class ItemViewSet(viewsets.ModelViewSet):
         item = self.get_object()
         serialized_data = AddPhotoSerializer(data=request.data)
         if serialized_data.is_valid():
-            photo = Photo.objects.filter(item=item, author__user=request.user).first()
-            if photo:
-                photo.description = serialized_data.validated_data['picture']
-                photo.save()
-            else:
-                photo = Photo.objects.create(
-                        picture=serialized_data.validated_data['picture'],
-                        item=item,
-                        author=get_author(request.user),
-                )
+            photo = Photo.objects.create(
+                    picture=serialized_data.validated_data['picture'],
+                    item=item,
+                    author=get_author(request.user),
+            )
             recalculate_reputation(photo.author)
             response = {
                 'success': True,
